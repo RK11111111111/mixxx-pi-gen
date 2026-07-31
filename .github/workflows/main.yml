@@ -10,6 +10,18 @@ on:
       - "**"
   schedule:
     - cron: '30 0 * * *'
+  workflow_dispatch:
+    inputs:
+      mixxx_ref:
+        description: 'Mixxx tag or branch to build'
+        required: false
+        default: '2.5.6'
+        type: string
+      build_image:
+        description: 'Also produce a flashable Raspberry Pi image'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   # build_self_hosted:
@@ -56,12 +68,15 @@ jobs:
   #       path: deploy/*.version
   build:
     runs-on: ubuntu-24.04-arm
+    env:
+      MIXXX_REF: ${{ inputs.mixxx_ref || '2.5.6' }}
+      BUILD_IMAGE: ${{ github.event_name != 'workflow_dispatch' || inputs.build_image }}
     steps:
     - uses: actions/checkout@v4
     - name: Update apt-get
       run: sudo apt-get update
     - name: Install deps
-      run: sudo apt-get install coreutils quilt parted kpartx qemu-utils qemu-user debootstrap zerofree zip dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc
+      run: sudo apt-get install --no-install-recommends -y coreutils quilt parted kpartx qemu-utils qemu-user-binfmt debootstrap zerofree zip dosfstools libarchive-tools libcap2-bin grep rsync xz-utils file git curl bc gpg pigz
     - run: mkdir .ccache
     - name: "Set up ccache cache"
       uses: actions/cache@v4
@@ -72,13 +87,20 @@ jobs:
           ccache-${{ github.head_ref }}
           ccache
     - run: ls -lah .ccache
-    - name: Build
-      run: sudo ./build.sh
+    - name: Build Mixxx package
+      run: |
+        if [ "$BUILD_IMAGE" = "true" ]; then
+          sudo env MIXXX_REF="$MIXXX_REF" ./build.sh
+        else
+          sudo env MIXXX_REF="$MIXXX_REF" PACKAGE_ONLY=1 STAGE_LIST="stage0 stage1 stage2 stage3" ./build.sh
+        fi
     - uses: actions/upload-artifact@v4
       with:
         name: debs-qemu
         path: deploy/*.deb
-    - uses: actions/upload-artifact@v4
+        if-no-files-found: error
+    - if: env.BUILD_IMAGE == 'true'
+      uses: actions/upload-artifact@v4
       with:
         name: images-qemu
         path: deploy/*.zip
@@ -86,14 +108,17 @@ jobs:
       with:
         name: packages-info-qemu
         path: deploy/*.info
+        if-no-files-found: error
     - uses: actions/upload-artifact@v4
       with:
         name: mixxx-version-qemu
         path: deploy/*.version
+        if-no-files-found: error
     - uses: actions/upload-artifact@v4
       with:
         name: mixxx-tag-qemu
         path: deploy/*.tag
+        if-no-files-found: error
 
   release:
     needs: build
@@ -151,5 +176,5 @@ jobs:
         prerelease: true
         allowUpdates: true
         immutableCreate: true
-        artifacts: "debs/*,images/*,info/*,version/*"
+        artifacts: "debs/*,images/*,info/*,version/*,tag/*"
         token: ${{ secrets.GITHUB_TOKEN }}

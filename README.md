@@ -11,7 +11,7 @@ tl;dr just want to dj with the latest image: [instructions](https://github.com/f
 
 This repo is for the generation of a raspbian image for Mixxx.
 Included:
-- Mixxx 2.4 beta built from the [Mixxx](https://mixxx.org) repo
+- Mixxx 2.5.6 built from the [Mixxx](https://mixxx.org) repo
 - 64 bit Raspberry Pi OS (Debian 13 "trixie")
 - preempt=full commandline argument on standard kernel and performance CPU governer as standard
 - sway (i3 for wayland) window manager with autostart to Mixxx
@@ -63,3 +63,18 @@ Plugging in a keyboard and hitting `super+enter` will give you a terminal.
 Logs for mixxx are available at: /home/pi/.mixxx/mixxx.log
 
 Original instructions of forked repo are in [pi-gen-readme](pi-gen-readme.md)
+
+## Building a replacement Mixxx package
+
+The GitHub Actions workflow pins Mixxx to `MIXXX_REF` in [config](config),
+currently the upstream `2.5.6` release. Use **Actions → CI → Run workflow** to
+build that version or supply another upstream Mixxx tag or branch. A manual run
+builds the `.deb` artifact only by default; enable **Also produce a flashable
+Raspberry Pi image** when an image is needed.
+
+Before installing the generated `.deb`, clone your Pi's SD card or image and
+confirm that it runs the same Raspberry Pi OS/Debian release as this repository
+(`trixie` by default in [build.sh](build.sh)). A package built against `trixie`
+can require newer libraries than an older Bookworm-based image provides. On the
+copied image, inspect the package first with `dpkg-deb -I mixxx*.deb`, then use
+`sudo apt install ./mixxx*.deb` so APT can resolve any dependencies.

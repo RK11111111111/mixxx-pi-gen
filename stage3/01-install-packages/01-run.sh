@@ -4,7 +4,7 @@ mkdir -p ${BASE_DIR}/.ccache/
 mkdir -p "${ROOTFS_DIR}/ccache"
 mount --bind ${BASE_DIR}/.ccache  "${ROOTFS_DIR}/ccache"
 on_chroot << EOF
-    git clone --branch 2.5 https://github.com/mixxxdj/mixxx.git /code/
+    git clone --depth 1 --branch "${MIXXX_REF}" https://github.com/mixxxdj/mixxx.git /code/
     cd /code/
     tools/debian_buildenv.sh setup
     git rev-parse HEAD > /opt/mixxx.version
@@ -30,4 +30,9 @@ EOF
 unmount "${BASE_DIR}/.ccache"
 mkdir -p "$DEPLOY_DIR"
 cp ${ROOTFS_DIR}/code/build/*.deb "$DEPLOY_DIR/"
+if [ "${PACKAGE_ONLY}" = "1" ]; then
+    cp "${ROOTFS_DIR}/opt/mixxx.version" "${DEPLOY_DIR}/mixxx.version"
+    cp "${ROOTFS_DIR}/opt/mixxx.tag" "${DEPLOY_DIR}/mixxx.tag"
+    dpkg-deb -I "${DEPLOY_DIR}"/*.deb > "${DEPLOY_DIR}/mixxx-package.info"
+fi
 rm -rf ${ROOTFS_DIR}/code/
